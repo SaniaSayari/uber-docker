@@ -1,4 +1,3 @@
-```yaml
 name: Docker Compose CI
 
 on:
@@ -27,4 +26,3 @@ jobs:
 
       - name: Build custom service images
         run: docker compose build api location matcher simulator-alpha
-```
