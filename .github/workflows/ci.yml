@@ -1,12 +1,15 @@
-name: Docker Compose CI
+name: Docker Compose CI-CD
 
-on:
+'on':
   push:
     branches:
       - main
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   validate-and-build:
@@ -26,3 +29,56 @@ jobs:
 
       - name: Build custom service images
         run: docker compose build api location matcher simulator-alpha
+
+  publish-images:
+    needs: validate-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service: api
+            dockerfile: api_service/Dockerfile
+            service_context: api_service
+          - service: location
+            dockerfile: location_service/Dockerfile
+            service_context: location_service
+          - service: matcher
+            dockerfile: matcher_service/Dockerfile
+            service_context: matcher_service
+          - service: simulator-alpha
+            dockerfile: driver_simulator/Dockerfile
+            service_context: driver_simulator
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        id: image
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service_context }}
+          file: ./${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
