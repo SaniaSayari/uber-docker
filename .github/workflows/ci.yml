@@ -1,0 +1,30 @@
+```yaml
+name: Docker Compose CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+
+    env:
+      POSTGRES_DB: georide
+      POSTGRES_USER: georide_user
+      POSTGRES_PASSWORD: ci_test_password
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Build custom service images
+        run: docker compose build api location matcher simulator-alpha
+```
